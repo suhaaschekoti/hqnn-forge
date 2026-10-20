@@ -1032,7 +1032,8 @@ class TestCommandLine:
         if case == "missing directory":
             out, reason = tmp_path / "missing" / "x.jsonl", "No such file or directory"
         elif case == "a directory":
-            out, reason = tmp_path / "results", "Is a directory"
+            out = tmp_path / "results"
+            reason = "Permission denied" if os.name == "nt" else "Is a directory"
             out.mkdir()
             (out / "earlier.jsonl").write_text("an earlier run\n", encoding="utf-8")
         else:
@@ -1087,7 +1088,10 @@ class TestCommandLine:
     def test_a_broken_symlink_out_is_refused(self, tmp_path: Path) -> None:
         """Its target's missing directory is checked, not the symlink's own one."""
         out = tmp_path / "results.jsonl"
-        out.symlink_to(tmp_path / "gone" / "results.jsonl")
+        try:
+            out.symlink_to(tmp_path / "gone" / "results.jsonl")
+        except (OSError, NotImplementedError) as exc:
+            pytest.skip(f"symlink creation is unavailable: {exc}")
         message = f"out {str(out)!r} cannot be written: No such file or directory."
         with pytest.raises(ValueError, match=f"^{re.escape(message)}$"):
             bench.check_writable(out)
